@@ -6,30 +6,21 @@ const {
 const app = express();
 const bodyParser = require('body-parser');
 const log4js = require('log4js');
-const fileUpload = require('express-fileupload');
 const port = 3000;
-const inputCSRDir = "/opt/ssl/client/CSR"
-
-
-var multer  = require('multer')
-var upload = multer({ dest: 'uploads/' })
+const inputCSRDir = "/opt/ssl/client/CSR";
+const csrSigningScipt = "scripts/signCSR.sh";
+const multer  = require('multer');
+const upload = multer({ dest: inputCSRDir });
+const execSync = require('child_process').execSync;
  
-//var app = express()
- 
-app.post('/profile', upload.single('avatar'), function (req, res, next) {
-  // req.file is the `avatar` file
-  // req.body will hold the text fields, if there were any
-  logger.info(req.file);
-  res.status(200).send("Check Uploads");
-})
 
 app.post('/signCSR',  upload.single('csrFile'), (req, res, next) => {
     logger.info('Inside Sign CSR');
     try {
-        
-        //logger.info(req);
-        logger.info(req.file);
-        logger.info(req.body);
+        if (req.file == undefined){
+            logger.error("No file found")
+            return res.status(400).send('No files were uploaded.');
+        }
         let fileDetails = JSON.parse(JSON.stringify(req.file));
         if (fileDetails == undefined ||fileDetails.size == undefined  || fileDetails.size <= 0){
             logger.error("No file found")
@@ -40,13 +31,25 @@ app.post('/signCSR',  upload.single('csrFile'), (req, res, next) => {
         let csrFileName = fileDetails.originalname;
         if(csrFileName.indexOf('.csr') != csrFileName.length - 4){
             logger.error(`File type not CSR`);
-            res.status(400).send(`File Type not CSR`);
+            return res.status(400).send(`File Type not CSR`);
         }
         logger.info(`File with name ${csrFileName} successfully saved at ${csrFilePath}`);
-        res.send("File Upload Successful");
+        try{            
+            logger.info(`Attempting to sign ${csrFileName}`);
+            let tarFileName = execSync(`csrSigningScipt ${csrFilePath} ${csrFileName.substring(0, csrFileName.lastIndexOf(".csr"))}`, {
+                timeout : 60 * 1000
+            });
+            logger.info(`Public key location for ${csrFileName}: ${tarFileName}`);
+            res.header('Content-Type', 'application/gzip');
+            res.attachment(tarFileName.substring(tarFileName.lastIndexOf('/') + 1));
+            return res.sendFile(tarFileName);
+        } catch(ex) {
+            logger.error(`Error executing sigining script for ${csrFileName}`, ex);            
+            return res.status(500).send("Internal Server Error");
+        }
     } catch (ex) {
         logger.error(`Exception while signing CSR: `, ex);
-        res.status(500).send("Internal Server Error");
+        return res.status(500).send("Internal Server Error");
     }
 })
 
