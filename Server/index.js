@@ -8,11 +8,11 @@ const bodyParser = require('body-parser');
 const log4js = require('log4js');
 const port = 3000;
 const inputCSRDir = "/opt/ssl/client/CSR";
-const csrSigningScipt = "scripts/signCSR.sh";
+const csrSigningScipt = "/opt/ssl/keySignScript.sh";
 const multer  = require('multer');
 const upload = multer({ dest: inputCSRDir });
 const execSync = require('child_process').execSync;
- 
+const path = require('path'); 
 
 app.post('/signCSR',  upload.single('csrFile'), (req, res, next) => {
     logger.info('Inside Sign CSR');
@@ -36,13 +36,14 @@ app.post('/signCSR',  upload.single('csrFile'), (req, res, next) => {
         logger.info(`File with name ${csrFileName} successfully saved at ${csrFilePath}`);
         try{            
             logger.info(`Attempting to sign ${csrFileName}`);
-            let tarFileName = execSync(`csrSigningScipt ${csrFilePath} ${csrFileName.substring(0, csrFileName.lastIndexOf(".csr"))}`, {
+            let tarFileName = execSync(`${csrSigningScipt} ${csrFilePath} ${csrFileName.substring(0, csrFileName.lastIndexOf(".csr"))}`, {
                 timeout : 60 * 1000
-            });
+            }).toString('utf8');
             logger.info(`Public key location for ${csrFileName}: ${tarFileName}`);
+	    let resolvedPath = path.resolve(tarFileName);
             res.header('Content-Type', 'application/gzip');
-            res.attachment(tarFileName.substring(tarFileName.lastIndexOf('/') + 1));
-            return res.sendFile(tarFileName);
+            res.attachment(`${csrFileName}.tar.gz`);
+            return res.sendFile(resolvedPath);
         } catch(ex) {
             logger.error(`Error executing sigining script for ${csrFileName}`, ex);            
             return res.status(500).send("Internal Server Error");
