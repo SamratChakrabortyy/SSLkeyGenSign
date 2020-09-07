@@ -30,13 +30,14 @@ app.post('/signCSR',  upload.single('csrFile'), (req, res, next) => {
         //logger.info(req);
         logger.info(req.file);
         logger.info(req.body);
-        if (!req.file || Object.keys(req.files).size === 0){
+        let fileDetails = JSON.parse(JSON.stringify(req.file));
+        if (fileDetails == undefined ||fileDetails.size == undefined  || fileDetails.size <= 0){
             logger.error("No file found")
             return res.status(400).send('No files were uploaded.');
         }
-        logger.info(`CSR file details: ${req.file}`);
-        let csrFilePath = req.file.path;
-        let csrFileName = req.file.originalname;
+        logger.info(`CSR file details: ${JSON.stringify(fileDetails)}`);
+        let csrFilePath = fileDetails.path;
+        let csrFileName = fileDetails.originalname;
         if(csrFileName.indexOf('.csr') != csrFileName.length - 4){
             logger.error(`File type not CSR`);
             res.status(400).send(`File Type not CSR`);
